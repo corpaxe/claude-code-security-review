@@ -157,18 +157,20 @@ class HardExclusionRules:
 class FindingsFilter:
     """Main filter class for security findings."""
     
-    def __init__(self, 
+    def __init__(self,
                  use_hard_exclusions: bool = True,
                  use_claude_filtering: bool = True,
                  api_key: Optional[str] = None,
+                 base_url: Optional[str] = None,
                  model: str = DEFAULT_CLAUDE_MODEL,
                  custom_filtering_instructions: Optional[str] = None):
         """Initialize findings filter.
-        
+
         Args:
             use_hard_exclusions: Whether to apply hard exclusion rules
             use_claude_filtering: Whether to use Claude API for filtering
             api_key: Anthropic API key for Claude filtering
+            base_url: Custom API base URL (if None, reads from ANTHROPIC_BASE_URL env var)
             model: Claude model to use for filtering
             custom_filtering_instructions: Optional custom filtering instructions
         """
@@ -182,7 +184,8 @@ class FindingsFilter:
             try:
                 self.claude_client = ClaudeAPIClient(
                     model=model,
-                    api_key=api_key
+                    api_key=api_key,
+                    base_url=base_url
                 )
                 # Validate API access
                 valid, error = self.claude_client.validate_api_access()

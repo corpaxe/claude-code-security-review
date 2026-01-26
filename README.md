@@ -33,11 +33,30 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
-      
+
       - uses: anthropics/claude-code-security-review@main
         with:
-          comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          comment-pr: true
+```
+
+**Customize the model (optional):**
+
+```yaml
+# Use Sonnet for faster/cheaper analysis (default is Opus)
+- uses: anthropics/claude-code-security-review@main
+  with:
+    claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+    claude-model: claude-sonnet-4-5-20250514
+    comment-pr: true
+
+# With LiteLLM proxy - use the proxy's Sonnet mapping
+- uses: anthropics/claude-code-security-review@main
+  with:
+    claude-api-key: ${{ secrets.LITELLM_API_KEY }}
+    claude-base-url: ${{ vars.LITELLM_BASE_URL }}
+    claude-model: ${{ vars.ANTHROPIC_DEFAULT_SONNET_MODEL }}
+    comment-pr: true
 ```
 
 ## Security Considerations
@@ -51,14 +70,67 @@ This action is not hardened against prompt injection attacks and should only be 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
 | `claude-api-key` | Anthropic Claude API key for security analysis. <br>*Note*: This API key needs to be enabled for both the Claude API and Claude Code usage. | None | Yes |
+| `claude-base-url` | Custom Anthropic API base URL (e.g., for LiteLLM proxy). Defaults to official Anthropic API endpoint. | None | No |
+| `anthropic-default-haiku-model` | Override Claude Code's internal Haiku model. Used transparently by Claude Code CLI for operations requiring fast/cheap models. Critical for LiteLLM proxies with custom model mappings. | `claude-3-5-haiku-20241022` | No |
+| `anthropic-default-sonnet-model` | Override Claude Code's internal Sonnet model. Used transparently by Claude Code CLI for balanced performance operations. Critical for LiteLLM proxies with custom model mappings. | `claude-sonnet-4-5-20250514` | No |
+| `anthropic-default-opus-model` | Override Claude Code's internal Opus model. Used transparently by Claude Code CLI for complex reasoning operations. Critical for LiteLLM proxies with custom model mappings. | `claude-opus-4-1-20250805` | No |
 | `comment-pr` | Whether to comment on PRs with findings | `true` | No |
 | `upload-results` | Whether to upload results as artifacts | `true` | No |
 | `exclude-directories` | Comma-separated list of directories to exclude from scanning | None | No |
-| `claude-model` | Claude [model name](https://docs.anthropic.com/en/docs/about-claude/models/overview#model-names) to use. Defaults to Opus 4.1. | `claude-opus-4-1-20250805` | No |
+| `claude-model` | Claude [model name](https://docs.anthropic.com/en/docs/about-claude/models/overview#model-names) to use for the main security analysis. Controls which model Claude Code CLI uses for scanning. Defaults to Opus 4.1 for maximum analysis depth. **Note**: This is different from the `anthropic-default-*-model` inputs, which control Claude Code's internal operations. | `claude-opus-4-1-20250805` | No |
 | `claudecode-timeout` | Timeout for ClaudeCode analysis in minutes | `20` | No |
 | `run-every-commit` | Run ClaudeCode on every commit (skips cache check). Warning: May increase false positives on PRs with many commits. | `false` | No |
 | `false-positive-filtering-instructions` | Path to custom false positive filtering instructions text file | None | No |
 | `custom-security-scan-instructions` | Path to custom security scan instructions text file to append to audit prompt | None | No |
+
+### Using with LiteLLM Proxy
+
+To use this action with a LiteLLM proxy or custom Anthropic-compatible endpoint:
+
+```yaml
+- uses: anthropics/claude-code-security-review@main
+  with:
+    claude-api-key: ${{ secrets.LITELLM_API_KEY }}
+    claude-base-url: ${{ vars.LITELLM_BASE_URL }}
+    comment-pr: true
+```
+
+#### Model Family Overrides
+
+Claude Code CLI uses different models internally for various operations (validation, thinking tokens, cost optimization). When using a LiteLLM proxy, these internal model names need to be overridden to match your proxy's model mappings:
+
+```yaml
+- uses: anthropics/claude-code-security-review@main
+  with:
+    claude-api-key: ${{ secrets.LITELLM_API_KEY }}
+    claude-base-url: ${{ vars.LITELLM_BASE_URL }}
+    anthropic-default-haiku-model: ${{ vars.ANTHROPIC_DEFAULT_HAIKU_MODEL }}
+    anthropic-default-sonnet-model: ${{ vars.ANTHROPIC_DEFAULT_SONNET_MODEL }}
+    anthropic-default-opus-model: ${{ vars.ANTHROPIC_DEFAULT_OPUS_MODEL }}
+    comment-pr: true
+```
+
+**How it works:**
+- These environment variables are passed to the Claude Code CLI subprocess
+- Claude Code reads them transparently and uses them for its internal operations
+- Your LiteLLM proxy receives the overridden model names instead of Anthropic's defaults
+- This allows you to route different model families to different backends or use custom model mappings
+
+**Example LiteLLM proxy scenario:**
+```yaml
+vars:
+  LITELLM_BASE_URL: 'https://proxy.company.com/v1'
+  # Map Claude model families to your proxy's model names
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: 'company/fast-model'
+  ANTHROPIC_DEFAULT_SONNET_MODEL: 'company/balanced-model'
+  ANTHROPIC_DEFAULT_OPUS_MODEL: 'company/premium-model'
+```
+
+**Important**: When using a custom base URL, ensure:
+- Your proxy endpoint is compatible with the Anthropic Messages API format
+- The `claude-api-key` matches the authentication expected by your proxy
+- Your proxy supports the Claude model specified in `claude-model`
+- If using model family overrides, ensure the override model names exist in your proxy configuration and are properly mapped
 
 ### Action Outputs
 
@@ -66,6 +138,40 @@ This action is not hardened against prompt injection attacks and should only be 
 |--------|-------------|
 | `findings-count` | Total number of security findings |
 | `results-file` | Path to the results JSON file |
+
+### Understanding Model Configuration
+
+This action supports two types of model configuration:
+
+1. **Main Analysis Model** (`claude-model` input):
+   - Controls which model performs the security analysis
+   - Directly passed to Claude Code CLI via `--model` flag
+   - Defaults to Opus 4.1 for maximum analysis depth
+   - Can be set to Sonnet for balance, Haiku for speed, or even use `${{ vars.ANTHROPIC_DEFAULT_SONNET_MODEL }}` for proxy compatibility
+   - Example: `claude-model: claude-sonnet-4-5-20250514`
+
+2. **Claude Code Internal Models** (`anthropic-default-*-model` inputs):
+   - Controls which models Claude Code uses for its internal operations
+   - Only needed when using LiteLLM proxies with custom model mappings
+   - Claude Code makes these model choices transparently during execution
+   - Most users can ignore these unless using a proxy
+
+**Example - Cost Optimization:**
+```yaml
+# Default is Opus. Use Sonnet for balanced cost/performance:
+claude-model: claude-sonnet-4-5-20250514
+
+# Claude Code still uses appropriate models internally (Haiku for validation, etc.)
+# No need to set anthropic-default-*-model unless using a proxy
+```
+
+**Example - Using Proxy Model Variables:**
+```yaml
+# Use your LiteLLM proxy's Sonnet mapping for the main analysis:
+claude-model: ${{ vars.ANTHROPIC_DEFAULT_SONNET_MODEL }}
+
+# This ensures the main analysis model matches your proxy's Sonnet mapping
+```
 
 ## How It Works
 

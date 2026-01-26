@@ -29,7 +29,7 @@ inputs:
     default: ''
 
   claude-model:
-    description: 'Claude model to use for security analysis (e.g., claude-sonnet-4-20250514)'
+    description: 'Claude model to use for security analysis. Defaults to Opus 4.1. Can be set to a different model or use GitHub vars/secrets for proxy compatibility.'
     required: false
     default: ''
 
@@ -45,6 +45,26 @@ inputs:
 
   custom-security-scan-instructions:
     description: 'Path to custom security scan instructions text file to append to audit prompt'
+    required: false
+    default: ''
+
+  claude-base-url:
+    description: 'Custom Anthropic API base URL (e.g., for LiteLLM proxy). Defaults to official Anthropic API endpoint.'
+    required: false
+    default: ''
+
+  anthropic-default-haiku-model:
+    description: 'Override Claude Code CLI internal Haiku model (for LiteLLM proxy model mapping). Sets ANTHROPIC_DEFAULT_HAIKU_MODEL env var.'
+    required: false
+    default: ''
+
+  anthropic-default-sonnet-model:
+    description: 'Override Claude Code CLI internal Sonnet model (for LiteLLM proxy model mapping). Sets ANTHROPIC_DEFAULT_SONNET_MODEL env var.'
+    required: false
+    default: ''
+
+  anthropic-default-opus-model:
+    description: 'Override Claude Code CLI internal Opus model (for LiteLLM proxy model mapping). Sets ANTHROPIC_DEFAULT_OPUS_MODEL env var.'
     required: false
     default: ''
 
@@ -182,6 +202,10 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         ANTHROPIC_API_KEY: ${{ inputs.claude-api-key }}
+        ANTHROPIC_BASE_URL: ${{ inputs.claude-base-url }}
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ inputs.anthropic-default-haiku-model }}
+        ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ inputs.anthropic-default-sonnet-model }}
+        ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ inputs.anthropic-default-opus-model }}
         ENABLE_CLAUDE_FILTERING: 'true' 
         EXCLUDE_DIRECTORIES: ${{ inputs.exclude-directories }}
         FALSE_POSITIVE_FILTERING_INSTRUCTIONS: ${{ inputs.false-positive-filtering-instructions }}
