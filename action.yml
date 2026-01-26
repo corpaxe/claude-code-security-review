@@ -29,7 +29,7 @@ inputs:
     default: ''
 
   claude-model:
-    description: 'Claude model to use for security analysis. Defaults to Opus 4.1. Can be set to a different model or use vars like ${{ vars.ANTHROPIC_DEFAULT_SONNET_MODEL }} for proxy compatibility.'
+    description: 'Claude model to use for security analysis. Defaults to Opus 4.1. Can be set to a different model or use GitHub vars/secrets for proxy compatibility.'
     required: false
     default: ''
 
