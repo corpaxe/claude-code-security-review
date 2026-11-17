@@ -115,6 +115,7 @@ class TestHelperFunctions:
                 use_hard_exclusions=True,
                 use_claude_filtering=True,
                 api_key='test-key-123',
+                base_url=None,
                 custom_filtering_instructions=None
             )
     
